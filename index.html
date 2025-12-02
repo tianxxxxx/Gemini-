@@ -2,67 +2,77 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>全息粒子实体手势交互系统</title>
+    <title>全息粒子手势交互系统 Pro</title>
+    <link href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Orbitron:wght@900&family=Pacifico&family=Roboto+Mono:wght@700&display=swap" rel="stylesheet">
     <style>
         body { margin: 0; overflow: hidden; background-color: #050505; font-family: 'Segoe UI', Roboto, sans-serif; color: white; }
         #container { position: relative; width: 100vw; height: 100vh; background: radial-gradient(circle at center, #1a1a2e, #000);}
         #input-video { display: none; }
         
-        /* UI 面板 - 科技风 */
+        /* UI 面板 */
         #ui-layer {
-            position: absolute; top: 20px; left: 20px; width: 340px;
-            background: rgba(10, 15, 30, 0.85); padding: 20px; border-radius: 12px;
+            position: absolute; top: 20px; left: 20px; width: 320px; max-height: 90vh;
+            background: rgba(10, 15, 30, 0.9); padding: 20px; border-radius: 12px;
             border: 1px solid rgba(0, 210, 255, 0.3);
             box-shadow: 0 0 20px rgba(0, 150, 255, 0.15);
-            backdrop-filter: blur(12px); z-index: 100;
+            backdrop-filter: blur(12px); z-index: 100; overflow-y: auto;
+            scrollbar-width: thin; scrollbar-color: #00f2ff #111;
         }
-        
-        h2 { margin: 0 0 15px 0; font-size: 18px; color: #00f2ff; text-transform: uppercase; letter-spacing: 2px; border-bottom: 1px solid rgba(0,242,255,0.2); padding-bottom: 10px;}
-        
-        .info-row { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 12px; color: #aaa; }
-        .highlight { color: #00f2ff; font-weight: bold; }
 
-        /* 输入区 */
-        .control-group { margin-top: 15px; }
-        input { 
-            width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #334; 
-            border-radius: 4px; background: #0f1220; color: #fff; box-sizing: border-box; outline: none;
-            transition: border 0.3s;
+        /* 滚动条样式 */
+        #ui-layer::-webkit-scrollbar { width: 6px; }
+        #ui-layer::-webkit-scrollbar-track { background: #111; }
+        #ui-layer::-webkit-scrollbar-thumb { background: #00f2ff; border-radius: 3px; }
+        
+        h2 { margin: 0 0 10px 0; font-size: 16px; color: #00f2ff; text-transform: uppercase; letter-spacing: 2px; border-bottom: 1px solid rgba(0,242,255,0.2); padding-bottom: 10px;}
+        h3 { font-size: 12px; color: #888; margin: 15px 0 5px 0; text-transform: uppercase; }
+
+        /* 输入控件通用样式 */
+        input[type="text"], select, input[type="number"] { 
+            width: 100%; padding: 8px; margin-bottom: 8px; border: 1px solid #334; 
+            border-radius: 4px; background: #0f1220; color: #fff; outline: none; transition: border 0.3s;
         }
         input:focus { border-color: #00f2ff; }
         
+        /* 颜色选择器容器 */
+        .color-picker-wrap { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-size: 13px; color: #ccc;}
+        input[type="color"] { border: none; width: 40px; height: 25px; cursor: pointer; background: none;}
+
+        /* 滑块 */
+        input[type="range"] { width: 100%; cursor: pointer; accent-color: #00f2ff; }
+
         button {
-            width: 100%; padding: 10px; border: none; border-radius: 4px;
+            width: 100%; padding: 10px; border: none; border-radius: 4px; margin-top: 5px;
             background: linear-gradient(90deg, #00c6ff, #0072ff); color: white; 
             font-weight: bold; cursor: pointer; text-transform: uppercase; letter-spacing: 1px;
-            box-shadow: 0 0 10px rgba(0, 114, 255, 0.4); transition: transform 0.2s;
+            transition: transform 0.2s;
         }
         button:hover { transform: scale(1.02); filter: brightness(1.2); }
+        button.secondary { background: #333; font-size: 10px; padding: 6px; margin-top: 10px; border: 1px solid #444;}
 
         /* 相似度仪表盘 */
-        .meter-container { margin-top: 20px; margin-bottom: 5px; }
-        .meter-label { font-size: 12px; color: #888; display: flex; justify-content: space-between;}
+        .meter-container { margin-top: 15px; margin-bottom: 5px; }
         .meter-bg { width: 100%; height: 6px; background: #333; border-radius: 3px; margin-top: 5px; overflow: hidden; }
-        .meter-fill { height: 100%; width: 0%; background: #00f2ff; transition: width 0.1s linear; box-shadow: 0 0 8px #00f2ff; }
+        .meter-fill { height: 100%; width: 0%; background: #00f2ff; transition: width 0.1s linear; }
 
         /* 列表 */
-        .list-wrap { max-height: 250px; overflow-y: auto; margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px;}
-        ul { list-style: none; padding: 0; margin: 0; font-size: 13px; }
-        li { padding: 8px 5px; border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: space-between; align-items: center;}
-        .tag { font-size: 10px; padding: 2px 6px; border-radius: 3px; background: #222; color: #bbb; }
-        .tag.double { background: linear-gradient(45deg, #ff0055, #ff4400); color: white; }
+        .list-wrap { max-height: 150px; overflow-y: auto; margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 5px;}
+        li { padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: space-between; align-items: center; font-size: 12px;}
+        .del-btn { color: #ff4444; cursor: pointer; font-weight: bold; padding: 0 5px; }
 
         /* 主显示文字 */
         #main-output {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            font-size: 120px; font-weight: 900; color: rgba(255,255,255,0.95);
-            text-shadow: 0 0 40px rgba(0, 242, 255, 0.8), 0 0 80px rgba(0, 114, 255, 0.6);
             white-space: nowrap; pointer-events: none; opacity: 0; 
             transition: opacity 0.2s, transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            z-index: 50; letter-spacing: 5px;
+            z-index: 50; 
+            /* 默认样式，会被JS覆盖 */
+            font-size: 100px; font-weight: 900; color: #ffffff;
+            text-shadow: 0 0 20px rgba(255,255,255,0.5);
         }
         #main-output.active { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
     </style>
+    
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
@@ -74,53 +84,193 @@
     <video id="input-video"></video>
     
     <div id="ui-layer">
-        <h2>Holographic Hand Core</h2>
-        <div class="info-row">
-            <span>FPS: <span id="fps-counter" class="highlight">60</span></span>
-            <span>Hands: <span id="hand-count" class="highlight">0</span></span>
-        </div>
+        <h2>交互控制台</h2>
         
-        <div class="control-group">
-            <input type="text" id="gesture-name" placeholder="定义手势含义 (如: 召唤)">
-            <button onclick="recordGesture()">RECORD GESTURE</button>
-        </div>
-
+        <h3>录制新动作</h3>
+        <input type="text" id="gesture-name" placeholder="输入显示的文字">
+        <button onclick="recordGesture()">⏺ 录制当前姿态</button>
+        
         <div class="meter-container">
-            <div class="meter-label"><span>匹配相似度</span><span id="score-val">0%</span></div>
+            <div style="font-size:12px; color:#aaa; display:flex; justify-content:space-between;">
+                <span>匹配度</span><span id="score-val">0%</span>
+            </div>
             <div class="meter-bg"><div class="meter-fill" id="similarity-bar"></div></div>
         </div>
-        
-        <div class="list-wrap">
-            <ul id="gesture-list">
-                </ul>
+
+        <h3>样式自定义</h3>
+        <div class="color-picker-wrap">
+            文字颜色
+            <input type="color" id="opt-color" value="#ffffff">
         </div>
+        <div class="color-picker-wrap">
+            发光颜色
+            <input type="color" id="opt-glow" value="#00f2ff">
+        </div>
+        
+        <div style="margin-bottom:8px; font-size:12px; color:#ccc;">
+            字体大小: <span id="size-val">100</span>px
+            <input type="range" id="opt-size" min="40" max="250" value="100">
+        </div>
+        
+        <select id="opt-font">
+            <option value="'Segoe UI', sans-serif">默认黑体 (Default)</option>
+            <option value="'Orbitron', sans-serif">科幻风格 (Sci-Fi)</option>
+            <option value="'Black Ops One', cursive">军事风格 (Military)</option>
+            <option value="'Pacifico', cursive">手写风格 (Cursive)</option>
+            <option value="'Roboto Mono', monospace">代码风格 (Mono)</option>
+        </select>
+
+        <h3 style="margin-top:20px;">手势库</h3>
+        <div class="list-wrap">
+            <ul id="gesture-list"></ul>
+        </div>
+        
+        <button class="secondary" onclick="exportData()">📋 复制当前库数据 (供预设使用)</button>
+        <button class="secondary" onclick="clearStorage()" style="background:#552222;">🗑 清空本地数据</button>
     </div>
 
-    <div id="main-output">SYSTEM READY</div>
+    <div id="main-output">READY</div>
 </div>
 
 <script>
-    // --- 1. Three.js 高级粒子系统 ---
+    // ==========================================
+    // 1. 数据库与持久化配置
+    // ==========================================
+
+    // 【开发者预设区】
+    // 如果你想给所有人预设手势，请在网页上录制好，点击“复制当前库数据”，
+    // 然后把复制的 JSON 粘贴替换下面这个空数组 []。
+    const PRESET_DB = []; 
+
+    // 运行时数据
+    let knownGestures = [];
+
+    // 初始化：加载预设 + 本地存储
+    function initDatabase() {
+        // 1. 加载本地存储
+        const localData = localStorage.getItem('myHandGestures');
+        let localGestures = [];
+        if (localData) {
+            try { localGestures = JSON.parse(localData); } catch(e) { console.error(e); }
+        }
+
+        // 2. 合并数据 (去重：如果名字一样，优先用本地的)
+        const combined = [...localGestures];
+        PRESET_DB.forEach(preset => {
+            if (!combined.find(g => g.name === preset.name)) {
+                combined.push(preset);
+            }
+        });
+        
+        knownGestures = combined;
+        renderList();
+        applyStyles(); // 应用保存的样式
+    }
+
+    // 保存到本地存储
+    function saveToStorage() {
+        // 我们只保存用户新增的，实际上为了简单，我们保存当前完整列表
+        // 实际开发中可以区分，但在Demo中全量保存最稳妥
+        localStorage.setItem('myHandGestures', JSON.stringify(knownGestures));
+    }
     
+    // 导出数据功能
+    window.exportData = function() {
+        const dataStr = JSON.stringify(knownGestures);
+        navigator.clipboard.writeText(dataStr).then(() => {
+            alert("数据已复制到剪贴板！\n\n请打开 index.html 代码，找到 'const PRESET_DB = []'，将内容粘贴进去即可实现预设。");
+        });
+    };
+
+    window.clearStorage = function() {
+        if(confirm("确定要清空所有本地手势吗？预设手势在刷新后会恢复。")) {
+            localStorage.removeItem('myHandGestures');
+            location.reload();
+        }
+    };
+
+    function deleteGesture(name) {
+        knownGestures = knownGestures.filter(g => g.name !== name);
+        saveToStorage();
+        renderList();
+    }
+
+    function renderList() {
+        const ul = document.getElementById('gesture-list');
+        ul.innerHTML = '';
+        knownGestures.forEach(g => {
+            const li = document.createElement('li');
+            li.innerHTML = `
+                <span>${g.name} <span style="color:#666; font-size:10px;">(${g.type})</span></span>
+                <span class="del-btn" onclick="deleteGesture('${g.name}')">×</span>
+            `;
+            ul.appendChild(li);
+        });
+    }
+
+    // ==========================================
+    // 2. 样式自定义逻辑
+    // ==========================================
+    const mainOutput = document.getElementById('main-output');
+    const inputColor = document.getElementById('opt-color');
+    const inputGlow = document.getElementById('opt-glow');
+    const inputSize = document.getElementById('opt-size');
+    const inputFont = document.getElementById('opt-font');
+    const sizeVal = document.getElementById('size-val');
+
+    // 加载样式设置
+    function applyStyles() {
+        const savedStyle = JSON.parse(localStorage.getItem('gestureStyle')) || {};
+        if(savedStyle.color) inputColor.value = savedStyle.color;
+        if(savedStyle.glow) inputGlow.value = savedStyle.glow;
+        if(savedStyle.size) inputSize.value = savedStyle.size;
+        if(savedStyle.font) inputFont.value = savedStyle.font;
+        updateMainOutput();
+    }
+
+    function updateMainOutput() {
+        const color = inputColor.value;
+        const glow = inputGlow.value;
+        const size = inputSize.value;
+        const font = inputFont.value;
+
+        sizeVal.textContent = size;
+        
+        mainOutput.style.color = color;
+        mainOutput.style.fontSize = `${size}px`;
+        mainOutput.style.fontFamily = font;
+        // 动态生成阴影
+        mainOutput.style.textShadow = `0 0 20px ${glow}, 0 0 40px ${glow}`;
+
+        // 保存样式偏好
+        localStorage.setItem('gestureStyle', JSON.stringify({
+            color, glow, size, font
+        }));
+    }
+
+    // 绑定事件
+    inputColor.addEventListener('input', updateMainOutput);
+    inputGlow.addEventListener('input', updateMainOutput);
+    inputSize.addEventListener('input', updateMainOutput);
+    inputFont.addEventListener('change', updateMainOutput);
+
+
+    // ==========================================
+    // 3. Three.js 粒子系统 (保持原版逻辑)
+    // ==========================================
     const scene = new THREE.Scene();
-    // 增加雾效，增强深邃感
     scene.fog = new THREE.FogExp2(0x050505, 0.02);
-
     const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-    // 调整相机位置，给手部更多活动空间
     camera.position.set(0, 0, 20);
-
-    const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: false }); // 关闭抗锯齿以提高粒子性能
+    const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: false });
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // 限制最大像素比，优化性能
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     document.getElementById('container').appendChild(renderer.domElement);
 
-    // 生成发光粒子贴图
     function getParticleTexture() {
         const canvas = document.createElement('canvas');
         canvas.width = 32; canvas.height = 32;
         const ctx = canvas.getContext('2d');
-        // 核心亮，边缘柔和
         const grad = ctx.createRadialGradient(16,16,0, 16,16,16);
         grad.addColorStop(0, 'rgba(200, 255, 255, 1)');
         grad.addColorStop(0.4, 'rgba(0, 180, 255, 0.5)');
@@ -130,149 +280,78 @@
         return new THREE.Texture(canvas);
     }
     const particleTex = getParticleTexture();
-    particleTex.needsUpdate = true;
 
-    // --- 实体手构建类 (Volumetric Hand) ---
-    // 这个类不再只是画点，而是根据骨骼位置填充体积
-    
-    const BONE_CONNECTIONS = [
-        [0,1], [1,2], [2,3], [3,4],        // 拇指
-        [0,5], [5,6], [6,7], [7,8],        // 食指
-        [0,9], [9,10], [10,11], [11,12],   // 中指
-        [0,13], [13,14], [14,15], [15,16], // 无名指
-        [0,17], [17,18], [18,19], [19,20], // 小指
-        [5,9], [9,13], [13,17], [0,17], [0,5] // 手掌补全
-    ];
+    const BONE_CONNECTIONS = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[0,9],[9,10],[10,11],[11,12],[0,13],[13,14],[14,15],[15,16],[0,17],[17,18],[18,19],[19,20],[5,9],[9,13],[13,17],[0,17],[0,5]];
 
     class VolumetricHand {
         constructor(color = 0x00f2ff) {
-            // 我们将生成约 3500 个粒子来填充手的体积
-            this.particleCount = 3500;
+            this.particleCount = 3000;
             this.geometry = new THREE.BufferGeometry();
             const positions = new Float32Array(this.particleCount * 3);
             this.geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-
             const material = new THREE.PointsMaterial({
-                color: color,
-                size: 0.6,
-                map: particleTex,
-                transparent: true,
-                opacity: 0.8,
-                blending: THREE.AdditiveBlending,
-                depthWrite: false
+                color: color, size: 0.6, map: particleTex, transparent: true, opacity: 0.8,
+                blending: THREE.AdditiveBlending, depthWrite: false
             });
-
             this.mesh = new THREE.Points(this.geometry, material);
             this.mesh.visible = false;
             scene.add(this.mesh);
-
-            // 预先分配粒子给每一根骨头，确保分布均匀
-            // 格式: { boneIndex: [startIndex, count, thickness] }
             this.distribution = [];
-            
-            // 简单的分配逻辑：25条连接线，平均分配
             const particlesPerBone = Math.floor(this.particleCount / BONE_CONNECTIONS.length);
-            
             BONE_CONNECTIONS.forEach((pair, i) => {
-                // 手掌部分的连接线需要粗一点
-                let thickness = 0.8; 
-                if (i >= 20) thickness = 1.5; // 手掌区域更厚
-                else if (pair[1] % 4 === 0) thickness = 0.5; // 指尖更细
-
+                let thickness = (i >= 20) ? 1.5 : (pair[1] % 4 === 0 ? 0.5 : 0.8);
                 this.distribution.push({
-                    startJoint: pair[0],
-                    endJoint: pair[1],
-                    startIndex: i * particlesPerBone,
-                    count: particlesPerBone,
-                    thickness: thickness
+                    startJoint: pair[0], endJoint: pair[1],
+                    startIndex: i * particlesPerBone, count: particlesPerBone, thickness: thickness
                 });
             });
-
-            // 缓存世界坐标，避免重复创建 Vector3
             this.worldJoints = Array(21).fill().map(() => new THREE.Vector3());
         }
 
         update(landmarks) {
-            if (!landmarks) {
-                this.mesh.visible = false;
-                return;
-            }
+            if (!landmarks) { this.mesh.visible = false; return; }
             this.mesh.visible = true;
-
-            // 1. 将 21 个关键点映射到 3D 空间
-            // 优化映射范围，使其更跟手
             landmarks.forEach((lm, i) => {
-                const x = (0.5 - lm.x) * 30;  // 扩大 X 范围
-                const y = (0.5 - lm.y) * 25;  // 扩大 Y 范围
-                const z = lm.z * -30;         // 深度
+                const x = (0.5 - lm.x) * 30;
+                const y = (0.5 - lm.y) * 25;
+                const z = lm.z * -30;
                 this.worldJoints[i].set(x, y, z);
             });
-
             const positions = this.geometry.attributes.position.array;
-
-            // 2. 体积插值：在骨骼之间填充粒子
             this.distribution.forEach(bone => {
                 const startPos = this.worldJoints[bone.startJoint];
                 const endPos = this.worldJoints[bone.endJoint];
-                
                 const vec = new THREE.Vector3().subVectors(endPos, startPos);
-                const len = vec.length();
-
                 for (let j = 0; j < bone.count; j++) {
                     const idx = (bone.startIndex + j) * 3;
-                    
-                    // 线性插值位置 (0.0 - 1.0)
                     const t = j / bone.count;
-                    
-                    // 添加随机抖动模拟体积 (圆柱体分布)
-                    // 使用简单的随机数生成管状分布
-                    const theta = Math.random() * Math.PI * 2;
-                    const r = Math.sqrt(Math.random()) * bone.thickness; // 随机半径
-                    
-                    // 基础位置
-                    const bx = startPos.x + vec.x * t;
-                    const by = startPos.y + vec.y * t;
-                    const bz = startPos.z + vec.z * t;
-
-                    // 这里为了性能做一个简单的球形随机，实际上沿着法线做会更完美，但对于粒子云足够了
-                    positions[idx] = bx + (Math.random() - 0.5) * bone.thickness;
-                    positions[idx+1] = by + (Math.random() - 0.5) * bone.thickness;
-                    positions[idx+2] = bz + (Math.random() - 0.5) * bone.thickness;
+                    positions[idx] = startPos.x + vec.x * t + (Math.random()-0.5)*bone.thickness;
+                    positions[idx+1] = startPos.y + vec.y * t + (Math.random()-0.5)*bone.thickness;
+                    positions[idx+2] = startPos.z + vec.z * t + (Math.random()-0.5)*bone.thickness;
                 }
             });
-
             this.geometry.attributes.position.needsUpdate = true;
         }
     }
 
-    // 创建双手实例
-    const leftHandVisual = new VolumetricHand(0x00f2ff); // 蓝青色
-    const rightHandVisual = new VolumetricHand(0xff0055); // 玫红色 (区分左右手)
+    const leftHandVisual = new VolumetricHand(0x00f2ff);
+    const rightHandVisual = new VolumetricHand(0xff0055);
     
-    // --- 2. 核心逻辑：改进的识别与录制 ---
-
-    let knownGestures = [];
+    // ==========================================
+    // 4. 手势识别核心
+    // ==========================================
     let currentFrameData = { left: null, right: null };
-    
-    // 性能优化：限制识别频率
     let lastProcessTime = 0;
-    const processInterval = 50; // ms (20fps识别率，渲染保持60fps)
+    const processInterval = 50;
 
-    // 改进的归一化：基于“边界框”的缩放
-    // 解决手离得远就识别不了的问题
     function getNormalizedFeatures(landmarks) {
-        // 1. 找重心 (Wrist usually works, but lets use wrist)
         const wrist = landmarks[0];
-        
-        // 2. 计算手的最大跨度 (用于缩放)
         let maxDist = 0;
         landmarks.forEach(p => {
             const d = Math.sqrt((p.x-wrist.x)**2 + (p.y-wrist.y)**2 + (p.z-wrist.z)**2);
             if(d > maxDist) maxDist = d;
         });
         if(maxDist === 0) maxDist = 1;
-
-        // 3. 生成特征向量：相对坐标 / 最大跨度
         return landmarks.map(p => ({
             x: (p.x - wrist.x) / maxDist,
             y: (p.y - wrist.y) / maxDist,
@@ -281,17 +360,14 @@
     }
 
     function calculateError(l1, l2) {
-        // 计算两个特征集之间的差异
         let totalError = 0;
         for (let i = 0; i < 21; i++) {
-            const dx = l1[i].x - l2[i].x;
-            const dy = l1[i].y - l2[i].y;
-            const dz = l1[i].z - l2[i].z;
-            totalError += (dx*dx + dy*dy + dz*dz);
+            totalError += ((l1[i].x - l2[i].x)**2 + (l1[i].y - l2[i].y)**2 + (l1[i].z - l2[i].z)**2);
         }
-        return totalError; // 越小越好
+        return totalError;
     }
 
+    // 录制并保存
     window.recordGesture = function() {
         const name = document.getElementById('gesture-name').value.trim();
         const hasLeft = !!currentFrameData.left;
@@ -310,28 +386,20 @@
         if(hasRight) newGesture.data.right = getNormalizedFeatures(currentFrameData.right);
 
         knownGestures.push(newGesture);
+        saveToStorage(); // 保存！
+        renderList();
         
-        // UI 更新
-        const ul = document.getElementById('gesture-list');
-        const li = document.createElement('li');
-        li.innerHTML = `<span>${name}</span> <span class="tag ${newGesture.type}">${newGesture.type === 'double' ? '双手' : '单手'}</span>`;
-        ul.appendChild(li);
         document.getElementById('gesture-name').value = '';
     };
 
-    const mainOutput = document.getElementById('main-output');
     const scoreBar = document.getElementById('similarity-bar');
     const scoreVal = document.getElementById('score-val');
     let outputTimer = null;
 
     function processGestures() {
         if(knownGestures.length === 0) return;
-
         let bestMatch = null;
         let minError = Infinity;
-
-        // 阈值设定：现在因为有了缩放归一化，阈值可以设得比较小且稳定
-        // 单手一般 0.5 左右，双手累加可能 1.0
         const THRESHOLD = 0.4; 
 
         knownGestures.forEach(gesture => {
@@ -339,158 +407,60 @@
             let matchCount = 0;
             let requiredCount = 0;
             
-            if (gesture.data.left) {
-                requiredCount++;
-                if (currentFrameData.left) {
-                    currentError += calculateError(gesture.data.left, getNormalizedFeatures(currentFrameData.left));
-                    matchCount++;
-                } else {
-                    currentError += 10; // 惩罚：需要左手但没检测到
-                }
-            }
-            
-            if (gesture.data.right) {
-                requiredCount++;
-                if (currentFrameData.right) {
-                    currentError += calculateError(gesture.data.right, getNormalizedFeatures(currentFrameData.right));
-                    matchCount++;
-                } else {
-                    currentError += 10; // 惩罚
-                }
-            }
+            if (gesture.data.left) { requiredCount++; if (currentFrameData.left) { currentError += calculateError(gesture.data.left, getNormalizedFeatures(currentFrameData.left)); matchCount++; } else { currentError += 10; } }
+            if (gesture.data.right) { requiredCount++; if (currentFrameData.right) { currentError += calculateError(gesture.data.right, getNormalizedFeatures(currentFrameData.right)); matchCount++; } else { currentError += 10; } }
 
-            // 平均误差
-            const avgError = currentError / requiredCount;
-
-            // 只有当必要的手都存在时才考虑匹配
+            const avgError = currentError / (requiredCount || 1);
             if (matchCount === requiredCount && avgError < minError) {
                 minError = avgError;
                 bestMatch = gesture.name;
             }
         });
 
-        // 更新仪表盘
         let confidence = 0;
-        if (minError < 2.0) { // 仅仅为了显示进度
-            confidence = Math.max(0, 1 - (minError / THRESHOLD)); 
-            // 如果 minError < THRESHOLD (0.4), confidence > 0.
-            // 让我们重新映射一下显示逻辑
-            confidence = Math.max(0, 1 - (minError / 0.8)) * 100;
-        }
-        
+        if (minError < 2.0) confidence = Math.max(0, 1 - (minError / 0.8)) * 100;
         scoreBar.style.width = `${confidence}%`;
         scoreVal.textContent = `${Math.round(confidence)}%`;
-
         if (minError < THRESHOLD) {
-            scoreBar.style.background = "#00ff88"; // 绿色表示匹配
-            scoreBar.style.boxShadow = "0 0 10px #00ff88";
-            
+            scoreBar.style.background = "#00ff88";
             if (mainOutput.textContent !== bestMatch || !mainOutput.classList.contains('active')) {
                 mainOutput.textContent = bestMatch;
                 mainOutput.classList.add('active');
                 if (outputTimer) clearTimeout(outputTimer);
-                // 保持显示 1.5 秒
-                outputTimer = setTimeout(() => {
-                    mainOutput.classList.remove('active');
-                }, 1500);
+                outputTimer = setTimeout(() => { mainOutput.classList.remove('active'); }, 1500);
             }
         } else {
-            scoreBar.style.background = "#00f2ff"; // 蓝色表示搜索中
-            scoreBar.style.boxShadow = "0 0 8px #00f2ff";
+            scoreBar.style.background = "#00f2ff";
         }
     }
 
-
-    // --- 3. MediaPipe 初始化 ---
+    // MediaPipe Setup
     const videoElem = document.getElementById('input-video');
-    
     function onResults(results) {
-        // 重置当帧数据
-        currentFrameData.left = null;
-        currentFrameData.right = null;
-        
-        let handCount = 0;
-        
-        // 渲染更新
+        currentFrameData.left = null; currentFrameData.right = null;
         if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-            handCount = results.multiHandLandmarks.length;
-            
-            // 先全部隐藏，下面匹配到了再显示
-            leftHandVisual.update(null);
-            rightHandVisual.update(null);
-
+            leftHandVisual.update(null); rightHandVisual.update(null);
             results.multiHandLandmarks.forEach((landmarks, index) => {
-                // 判断左右手
                 const label = results.multiHandedness[index].label;
-                // MediaPipe 前置摄像头镜像后：Label 'Left' 其实是画面中的右手(如果不翻转)。
-                // 为了逻辑统一，我们直接按 label 存，视觉上分开渲染。
-                
-                if (label === 'Left') {
-                    // 这里注意：MP 的 Left 通常对应人的左手（如果未镜像），但在屏幕上可能反的。
-                    // 简单处理：Left 对应 LeftVisual
-                    rightHandVisual.update(landmarks); // 这里的 Visual 颜色不同，方便调试
-                    currentFrameData.right = landmarks; // 存入数据
-                } else {
-                    leftHandVisual.update(landmarks);
-                    currentFrameData.left = landmarks;
-                }
+                if (label === 'Left') { rightHandVisual.update(landmarks); currentFrameData.right = landmarks; }
+                else { leftHandVisual.update(landmarks); currentFrameData.left = landmarks; }
             });
         } else {
-            leftHandVisual.update(null);
-            rightHandVisual.update(null);
+            leftHandVisual.update(null); rightHandVisual.update(null);
         }
-        
-        document.getElementById('hand-count').textContent = handCount;
-
-        // 识别逻辑节流
         const now = Date.now();
-        if (now - lastProcessTime > processInterval) {
-            processGestures();
-            lastProcessTime = now;
-        }
-
+        if (now - lastProcessTime > processInterval) { processGestures(); lastProcessTime = now; }
         renderer.render(scene, camera);
     }
 
     const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
-    
-    // 优化配置以提升速度和范围
-    hands.setOptions({
-        maxNumHands: 2,
-        modelComplexity: 1, // PC端保持 1 以获得较好精度，如果卡顿可改为 0
-        minDetectionConfidence: 0.5, // 降低一点以便在远处也能识别
-        minTrackingConfidence: 0.5
-    });
+    hands.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
     hands.onResults(onResults);
+    new Camera(videoElem, { onFrame: async () => { await hands.send({image: videoElem}); }, width: 1280, height: 720 }).start();
+    window.addEventListener('resize', () => { camera.aspect = window.innerWidth/window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
 
-    // 摄像头启动配置
-    const cameraUtils = new Camera(videoElem, {
-        onFrame: async () => { await hands.send({image: videoElem}); },
-        width: 1280, 
-        height: 720 
-    });
-    cameraUtils.start();
-
-    // FPS 简单计算
-    let frames = 0;
-    let lastTime = performance.now();
-    function animate() {
-        frames++;
-        const t = performance.now();
-        if (t - lastTime >= 1000) {
-            document.getElementById('fps-counter').textContent = frames;
-            frames = 0;
-            lastTime = t;
-        }
-        requestAnimationFrame(animate);
-    }
-    animate();
-
-    window.addEventListener('resize', () => {
-        camera.aspect = window.innerWidth / window.innerHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-    });
+    // 启动初始化
+    initDatabase();
 
 </script>
 </body>
