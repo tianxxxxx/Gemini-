@@ -2,57 +2,80 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>全息手势动态分析引擎</title>
-    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@700&display=swap" rel="stylesheet">
+    <title>AR 自定义动作识别 (基准重构版)</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@500;900&family=Orbitron:wght@900&display=swap" rel="stylesheet">
     <style>
-        body { margin: 0; overflow: hidden; background-color: #000; font-family: 'Share Tech Mono', monospace; }
+        body { margin: 0; overflow: hidden; background-color: #000; font-family: 'Noto Sans SC', sans-serif; }
+        #container { position: relative; width: 100vw; height: 100vh; }
         
-        /* 视频层：AR背景 */
+        /* 1. 视频层 (实景背景) */
         #input-video {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            object-fit: cover; transform: scaleX(-1); z-index: 0; filter: brightness(0.6) contrast(1.2);
+            object-fit: cover; transform: scaleX(-1); z-index: 0;
         }
 
-        /* UI层 */
-        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; }
+        /* 2. 左侧控制面板 (亚克力) */
+        #ui-layer {
+            position: absolute; top: 20px; left: 20px; width: 320px;
+            background: rgba(30, 30, 30, 0.6);
+            backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px; padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            color: #fff; z-index: 100;
+        }
 
-        /* 全息数据标签 (跟随手部) */
-        .hand-hud {
-            position: absolute; width: 180px; padding: 10px;
-            background: rgba(0, 20, 30, 0.85);
-            border: 1px solid rgba(0, 255, 255, 0.3);
-            border-left: 3px solid #00ffff;
-            color: #00ffff; font-size: 12px;
-            transform: translate(-50%, -120%); /* 位于手上方 */
-            backdrop-filter: blur(4px);
-            display: none; /* 默认隐藏 */
-            box-shadow: 0 0 15px rgba(0, 255, 255, 0.2);
-        }
-        .hand-hud h3 { margin: 0 0 5px 0; font-size: 14px; color: #fff; border-bottom: 1px solid rgba(255,255,255,0.2); }
-        .hud-row { display: flex; justify-content: space-between; margin-bottom: 2px; }
-        .hud-val { color: #fff; font-weight: bold; }
-
-        /* 中央大屏显示动作意图 */
-        #action-display {
-            position: absolute; top: 80%; left: 50%; transform: translate(-50%, -50%);
-            text-align: center; width: 100%;
-        }
-        #action-text {
-            font-family: 'Orbitron', sans-serif; font-size: 60px; color: #fff;
-            text-shadow: 0 0 20px #00ffff; letter-spacing: 5px; text-transform: uppercase;
-            opacity: 0; transition: opacity 0.2s;
-        }
-        #action-text.show { opacity: 1; transform: scale(1.1); }
+        h2 { margin: 0 0 15px 0; font-size: 16px; color: #00ffcc; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px; letter-spacing: 1px;}
         
-        /* 顶部状态栏 */
-        .top-bar {
-            position: absolute; top: 0; left: 0; width: 100%; padding: 10px 20px;
-            background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);
-            color: #00ffff; display: flex; justify-content: space-between; box-sizing: border-box;
-        }
+        .status-block { display: flex; justify-content: space-between; font-size: 12px; color: #ccc; margin-bottom: 15px; }
 
-        /* 矢量线 Canvas */
-        #vector-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 5; }
+        input { 
+            width: 100%; padding: 12px; margin-bottom: 10px; 
+            border: 1px solid #555; border-radius: 6px;
+            background: rgba(0,0,0,0.5); color: #fff; outline: none; box-sizing: border-box; font-weight: bold;
+        }
+        input:focus { border-color: #00ffcc; background: rgba(0,0,0,0.8); }
+
+        button {
+            width: 100%; padding: 12px; border: none; border-radius: 6px;
+            background: #eee; color: #111; 
+            font-weight: 900; cursor: pointer; transition: all 0.2s; text-transform: uppercase;
+        }
+        button:hover { background: #fff; transform: scale(1.02); }
+        button.recording { background: #ff4d4d; color: white; animation: pulse 1s infinite; }
+        
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
+
+        /* 匹配度条 */
+        .meter-wrap { margin-top: 15px; background: rgba(0,0,0,0.5); height: 6px; border-radius: 3px; overflow: hidden; }
+        .meter-fill { height: 100%; width: 0%; background: #00ffcc; transition: width 0.1s; }
+        .meter-info { display: flex; justify-content: space-between; font-size: 10px; color: #aaa; margin-top: 4px; }
+
+        /* 列表 */
+        .list-box { margin-top: 20px; max-height: 250px; overflow-y: auto; border-top: 1px solid rgba(255,255,255,0.1); padding-top:10px;}
+        .list-item { 
+            display: flex; justify-content: space-between; padding: 10px; 
+            background: rgba(255,255,255,0.05); margin-bottom: 5px; border-radius: 4px; font-size: 13px; align-items: center;
+        }
+        .del-icon { color: #ff6666; cursor: pointer; padding: 5px; font-weight: bold;}
+
+        /* 3. 全息文字显示 */
+        #hologram-display {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            font-family: 'Orbitron', sans-serif; font-weight: 900; font-size: 90px;
+            color: #fff; text-shadow: 0 0 20px #00ffcc, 0 0 50px #00ffcc;
+            pointer-events: none; opacity: 0; z-index: 200; white-space: nowrap;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        #hologram-display.active { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
+
+        /* 倒计时层 */
+        #countdown-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6); backdrop-filter: blur(10px);
+            display: none; justify-content: center; align-items: center; z-index: 300;
+        }
+        #countdown-text { font-size: 120px; font-weight: 900; color: #00ffcc; text-shadow: 0 0 40px #00ffcc; }
     </style>
     
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
@@ -62,37 +85,39 @@
 </head>
 <body>
 
-<video id="input-video"></video>
-<canvas id="vector-canvas"></canvas>
+<div id="container">
+    <video id="input-video"></video>
+    <div id="countdown-overlay"><div id="countdown-text">3</div></div>
+    
+    <div id="ui-layer">
+        <h2>自定义动作录制系统</h2>
+        <div class="status-block">
+            <span>系统: <span id="sys-status" style="color:#00ffcc">就绪</span></span>
+            <span>当前: <span id="hand-status">无手部</span></span>
+        </div>
 
-<div id="ui-layer">
-    <div class="top-bar">
-        <span>SYS: ANALYTIC ENGINE V4</span>
-        <span>MODE: REAL-TIME PHYSICS</span>
+        <input type="text" id="action-name" placeholder="输入你想显示的文字...">
+        <button id="rec-btn" onclick="triggerRecordFlow()">开始录制 (倒计时)</button>
+        
+        <div class="meter-wrap"><div class="meter-fill" id="match-bar"></div></div>
+        <div class="meter-info">
+            <span>差异值(Diff): <span id="diff-val">--</span></span>
+            <span>匹配度: <span id="conf-val">0%</span></span>
+        </div>
+
+        <div class="list-box" id="action-list"></div>
+        
+        <div style="margin-top:15px; font-size:10px; color:#666; text-align:center;">
+            算法: 相对坐标 DTW | 存储: 本地浏览器
+        </div>
     </div>
 
-    <div id="hud-left" class="hand-hud">
-        <h3>LEFT HAND [L]</h3>
-        <div class="hud-row"><span>STATE:</span> <span class="hud-val" id="l-state">--</span></div>
-        <div class="hud-row"><span>SPEED:</span> <span class="hud-val" id="l-speed">0</span></div>
-        <div class="hud-row"><span>DIR:</span> <span class="hud-val" id="l-dir">--</span></div>
-    </div>
-
-    <div id="hud-right" class="hand-hud">
-        <h3>RIGHT HAND [R]</h3>
-        <div class="hud-row"><span>STATE:</span> <span class="hud-val" id="r-state">--</span></div>
-        <div class="hud-row"><span>SPEED:</span> <span class="hud-val" id="r-speed">0</span></div>
-        <div class="hud-row"><span>DIR:</span> <span class="hud-val" id="r-dir">--</span></div>
-    </div>
-
-    <div id="action-display">
-        <div id="action-text">INITIALIZING</div>
-    </div>
+    <div id="hologram-display">HOLOGRAM</div>
 </div>
 
 <script>
     // ============================================
-    // 1. 3D 渲染层 (Three.js) - 实体手 + 识别点
+    // 1. 3D 场景与拟真手 (保持高颜值)
     // ============================================
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -102,54 +127,42 @@
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setClearColor(0x000000, 0);
-    document.body.appendChild(renderer.domElement);
+    document.getElementById('container').appendChild(renderer.domElement);
 
-    // 灯光
-    scene.add(new THREE.AmbientLight(0xffffff, 0.4));
-    const dirLight = new THREE.DirectionalLight(0x00ffff, 0.8);
-    dirLight.position.set(0, 10, 10);
-    scene.add(dirLight);
+    // 氛围光
+    scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+    const spotLight = new THREE.SpotLight(0x00ffcc, 1);
+    spotLight.position.set(5, 10, 10);
+    scene.add(spotLight);
 
-    // 2D 矢量画布 (用于画速度线)
-    const vecCanvas = document.getElementById('vector-canvas');
-    const vecCtx = vecCanvas.getContext('2d');
-    vecCanvas.width = window.innerWidth;
-    vecCanvas.height = window.innerHeight;
-
-    // --- 实体手模型 ---
-    class AnalyzedHand {
-        constructor(color) {
+    // 手部模型类
+    const BONES = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[0,9],[9,10],[10,11],[11,12],[0,13],[13,14],[14,15],[15,16],[0,17],[17,18],[18,19],[19,20],[5,9],[9,13],[13,17],[0,17],[0,5]];
+    
+    class RealHand {
+        constructor() {
             this.group = new THREE.Group();
             scene.add(this.group);
-            this.segments = [];
+            this.meshes = []; // 存储所有圆柱体和球体
             
-            // 材质：科技感半透明
+            // 材质：像皮肤一样的半透明材质
             const mat = new THREE.MeshPhysicalMaterial({
-                color: color, roughness: 0.2, metalness: 0.8,
-                transmission: 0.2, opacity: 0.9, transparent: true,
-                emissive: color, emissiveIntensity: 0.2
+                color: 0xffccaa, roughness: 0.3, metalness: 0.0,
+                transmission: 0.1, opacity: 0.95, transparent: true
             });
 
-            // 识别点材质
-            const dotMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-
-            // 骨骼
-            const BONES = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[0,9],[9,10],[10,11],[11,12],[0,13],[13,14],[14,15],[15,16],[0,17],[17,18],[18,19],[19,20],[5,9],[9,13],[13,17],[0,17],[0,5]];
-            
+            // 创建骨骼
             BONES.forEach(pair => {
-                const geo = new THREE.CylinderGeometry(0.3, 0.2, 1, 8);
+                const geo = new THREE.CylinderGeometry(0.5, 0.45, 1, 12);
                 geo.translate(0, 0.5, 0); geo.rotateX(Math.PI/2);
                 const mesh = new THREE.Mesh(geo, mat);
-                this.segments.push({ mesh: mesh, start: pair[0], end: pair[1] });
+                this.meshes.push({ type: 'bone', mesh: mesh, start: pair[0], end: pair[1] });
                 this.group.add(mesh);
             });
 
-            // 识别点 (Trackers)
-            this.joints = [];
+            // 创建关节
             for(let i=0; i<21; i++) {
-                const geo = new THREE.SphereGeometry(0.2, 8, 8);
-                const mesh = new THREE.Mesh(geo, dotMat);
-                this.joints.push(mesh);
+                const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.5, 12, 12), mat);
+                this.meshes.push({ type: 'joint', mesh: mesh, idx: i });
                 this.group.add(mesh);
             }
         }
@@ -160,260 +173,287 @@
 
             const worldPos = [];
             landmarks.forEach((lm, i) => {
-                const x = (0.5 - lm.x) * 30;
-                const y = (0.5 - lm.y) * 22;
-                const z = lm.z * -20;
-                const v = new THREE.Vector3(x, y, z);
-                worldPos.push(v);
-                this.joints[i].position.copy(v);
+                const x = (0.5 - lm.x) * 32;
+                const y = (0.5 - lm.y) * 24;
+                const z = lm.z * -25; // 深度
+                worldPos.push(new THREE.Vector3(x,y,z));
             });
 
-            this.segments.forEach(seg => {
-                const p1 = worldPos[seg.start];
-                const p2 = worldPos[seg.end];
-                seg.mesh.position.copy(p1);
-                seg.mesh.lookAt(p2);
-                seg.mesh.scale.set(1, 1, p1.distanceTo(p2));
+            this.meshes.forEach(item => {
+                if (item.type === 'joint') {
+                    item.mesh.position.copy(worldPos[item.idx]);
+                } else {
+                    const p1 = worldPos[item.start];
+                    const p2 = worldPos[item.end];
+                    item.mesh.position.copy(p1);
+                    item.mesh.lookAt(p2);
+                    item.mesh.scale.set(1, 1, p1.distanceTo(p2));
+                }
             });
-
-            return worldPos; // 返回3D坐标供物理引擎使用
         }
     }
 
-    const leftHandVisual = new AnalyzedHand(0x00ffff); // 青色左手
-    const rightHandVisual = new AnalyzedHand(0xff0055); // 红色右手
+    const leftHandVisual = new RealHand();
+    const rightHandVisual = new RealHand();
 
 
     // ============================================
-    // 2. 物理分析引擎 (Physics Analysis Engine)
+    // 2. 核心算法：基准化特征提取 (The Baseline)
     // ============================================
+    // 关键点：将绝对坐标转换为相对坐标，忽略手在屏幕的位置
+    
+    let savedActions = JSON.parse(localStorage.getItem('myActions') || '[]');
+    let liveBuffer = [];
+    const MAX_BUFFER = 50; // 实时缓存长度
 
-    class HandAnalyzer {
-        constructor(id, hudId) {
-            this.id = id;
-            this.hud = document.getElementById(hudId);
-            this.els = {
-                state: this.hud.querySelector('[id$="-state"]'),
-                speed: this.hud.querySelector('[id$="-speed"]'),
-                dir: this.hud.querySelector('[id$="-dir"]')
-            };
-            
-            // 历史数据
-            this.prevPos = null; // 上一帧手腕位置 {x, y}
-            this.velocity = { x: 0, y: 0 };
-            this.history = []; // 平滑 buffer
-            this.lastUpdate = 0;
-        }
+    // 惯性记忆：防止丢失时归零
+    let lastFeatures = Array(42).fill(0); // 21点 * 2手 * 3维 = 126? 不，我们要精简
 
-        analyze(landmarks, world3DPos) {
+    function extractRelativeFeatures(lLM, rLM) {
+        // 如果双手都丢了，返回惯性数据
+        if (!lLM && !rLM) return lastFeatures;
+
+        const feats = [];
+
+        // 处理单只手的函数
+        const processHand = (landmarks) => {
             if (!landmarks) {
-                this.hud.style.display = 'none';
-                this.prevPos = null;
-                return null;
+                // 如果这只手不在，填0占位
+                for(let i=0; i<15*3; i++) feats.push(0);
+                return;
             }
 
-            const now = Date.now();
-            const dt = (now - this.lastUpdate) / 1000;
-            this.lastUpdate = now;
-
-            // 1. 更新 HUD 位置 (跟随手腕)
-            // landmarks 是 0-1 的屏幕坐标
             const wrist = landmarks[0];
-            const screenX = (1 - wrist.x) * window.innerWidth; // 镜像翻转
-            const screenY = wrist.y * window.innerHeight;
+            // 计算尺度：手掌大小 (手腕到中指根部)
+            let scale = Math.sqrt((landmarks[9].x - wrist.x)**2 + (landmarks[9].y - wrist.y)**2 + (landmarks[9].z - wrist.z)**2) || 0.1;
+
+            // 选取关键特征点 (减少计算量，取指尖+指根)
+            const indices = [4, 8, 12, 16, 20, 5, 9, 13, 17, 2, 6, 10, 14, 18]; 
             
-            this.hud.style.display = 'block';
-            this.hud.style.left = screenX + 'px';
-            this.hud.style.top = screenY + 'px';
+            indices.forEach(i => {
+                // 核心：所有点减去手腕坐标 (x - wrist.x)
+                // 核心：除以 scale (消除距离远近影响)
+                feats.push((landmarks[i].x - wrist.x) / scale);
+                feats.push((landmarks[i].y - wrist.y) / scale);
+                feats.push((landmarks[i].z - wrist.z) / scale);
+            });
+        };
 
-            // 2. 计算手势状态 (State)
-            // 通过指尖到掌心的平均距离判断 张开/握拳
-            // 0: 手腕, 9: 中指根部. 以 wrist->9 距离为参考尺
-            const palmScale = this.dist(landmarks[0], landmarks[9]);
-            let openFingers = 0;
-            const tips = [4, 8, 12, 16, 20];
-            const pip = [2, 6, 10, 14, 18]; // 关节
-            
-            // 拇指判断特殊一点
-            if (this.dist(landmarks[4], landmarks[9]) > palmScale * 0.8) openFingers++;
+        // 先左手，后右手 (或者先右后左，只要录制和识别顺序一致即可)
+        // MediaPipe镜像后，Label Right 是屏幕右边的手
+        processHand(lLM); 
+        processHand(rLM);
 
-            // 其他四指
-            for(let i=1; i<5; i++) {
-                // 指尖到手腕的距离 vs 关节到手腕距离
-                if (this.dist(landmarks[tips[i]], landmarks[0]) > this.dist(landmarks[pip[i]], landmarks[0])) {
-                    openFingers++;
-                }
-            }
-            
-            const state = openFingers > 3 ? "OPEN (布)" : (openFingers < 2 ? "CLOSED (拳)" : "POINT (指)");
-            this.els.state.textContent = state;
-
-            // 3. 计算速度与方向 (Velocity & Direction)
-            let speed = 0;
-            let dir = "STATIC";
-
-            if (this.prevPos) {
-                // 计算位移 delta (屏幕坐标系)
-                const dx = wrist.x - this.prevPos.x;
-                const dy = wrist.y - this.prevPos.y;
-                
-                // 平滑处理速度
-                const rawSpeed = Math.sqrt(dx*dx + dy*dy) / (dt || 0.016);
-                speed = rawSpeed * 10; // 放大系数
-
-                // 简单的方向判断 (镜像后：x增大是向左)
-                // 修正：InputVideo scaleX(-1)。
-                // 原生: x=0(左), x=1(右)。Prev=0.5, Curr=0.6 -> 右移。
-                // 视觉上: 看起来像向右。
-                
-                if (speed > 0.8) { // 运动阈值
-                    if (Math.abs(dx) > Math.abs(dy)) {
-                        // 水平运动
-                        // 注意：因为是镜像，landmarks.x 变大意味着在视频里向左移动(用户视角的右)
-                        // 但为了逻辑直观，我们以屏幕视觉为准
-                        // 屏幕X = (1-x). 如果 x 变大(0.5->0.6)，屏幕X变小 -> 向左
-                        dir = dx > 0 ? "LEFT" : "RIGHT"; 
-                    } else {
-                        // 垂直运动 (y变大是向下)
-                        dir = dy > 0 ? "DOWN" : "UP";
-                    }
-                }
-                
-                // 画速度线
-                if (speed > 1.0) {
-                    drawVector(screenX, screenY, dx * -1000, dy * 1000); // 视觉放大
-                }
-            }
-
-            this.els.speed.textContent = speed.toFixed(1);
-            this.els.dir.textContent = dir;
-            if (speed > 2.0) this.els.dir.style.color = "#ff0055"; // 高速警示
-            else this.els.dir.style.color = "#00ffff";
-
-            this.prevPos = wrist;
-
-            return {
-                state: state, // "OPEN", "CLOSED", "POINT"
-                dir: dir,     // "UP", "DOWN", "LEFT", "RIGHT", "STATIC"
-                speed: speed, // 数值
-                pos: wrist    // {x, y, z}
-            };
+        // 如果双手都在，还可以加一个双手间距特征
+        if (lLM && rLM) {
+            const distX = lLM[0].x - rLM[0].x;
+            const distY = lLM[0].y - rLM[0].y;
+            const distZ = lLM[0].z - rLM[0].z;
+            feats.push(distX, distY, distZ);
+        } else {
+            feats.push(0, 0, 0);
         }
 
-        dist(p1, p2) {
-            return Math.sqrt((p1.x-p2.x)**2 + (p1.y-p2.y)**2);
-        }
+        lastFeatures = feats;
+        return feats;
     }
 
-    const leftAnalyzer = new HandAnalyzer('left', 'hud-left');
-    const rightAnalyzer = new HandAnalyzer('right', 'hud-right');
+    // DTW 匹配算法 (允许速度不同)
+    function computeDTW(seq1, seq2) {
+        const n = seq1.length;
+        const m = seq2.length;
+        // 长度差异太大直接跳过
+        if (Math.abs(n - m) > Math.min(n, m) * 0.6) return Infinity;
 
-    // 画线辅助函数
-    function drawVector(x, y, vx, vy) {
-        vecCtx.beginPath();
-        vecCtx.moveTo(x, y);
-        vecCtx.lineTo(x + vx, y + vy);
-        vecCtx.strokeStyle = "rgba(0, 255, 255, 0.5)";
-        vecCtx.lineWidth = 4;
-        vecCtx.lineCap = "round";
-        vecCtx.stroke();
-    }
+        const dtw = Array(n + 1).fill(null).map(() => Array(m + 1).fill(Infinity));
+        dtw[0][0] = 0;
 
+        for (let i = 1; i <= n; i++) {
+            const window = Math.max(10, Math.abs(n-m)+5);
+            const start = Math.max(1, i - window);
+            const end = Math.min(m, i + window);
 
-    // ============================================
-    // 3. 语义解释器 (Semantic Interpreter)
-    // ============================================
-    // 将两只手的数据综合，判断意图
-
-    const actionText = document.getElementById('action-text');
-    let actionTimer = null;
-
-    function interpretActions(lData, rData) {
-        // 清除画布
-        vecCtx.clearRect(0, 0, vecCanvas.width, vecCanvas.height);
-
-        let action = "";
-
-        // 单手逻辑
-        if (lData && !rData) {
-            if (lData.speed > 2.0 && lData.state === "OPEN (布)") action = `SWIPE ${lData.dir}`;
-            else if (lData.speed > 1.5 && lData.state === "CLOSED (拳)") action = `SMASH ${lData.dir}`;
-        }
-        else if (rData && !lData) {
-            if (rData.speed > 2.0 && rData.state === "OPEN (布)") action = `SWIPE ${rData.dir}`;
-            else if (rData.speed > 1.5 && rData.state === "CLOSED (拳)") action = `SMASH ${rData.dir}`;
-        }
-        
-        // 双手逻辑
-        else if (lData && rData) {
-            // 1. 距离计算
-            const dist = Math.sqrt((lData.pos.x - rData.pos.x)**2 + (lData.pos.y - rData.pos.y)**2);
-            
-            // 2. 交互判断
-            if (dist < 0.15) {
-                // 手在一起
-                if (lData.state.includes("拳") && rData.state.includes("拳")) action = "COMBINE (合体)";
-                else if (lData.state.includes("布") && rData.state.includes("布")) action = "CLAP (击掌)";
-            } else {
-                // 手分开
-                // 判断相对运动
-                // 如果左手向左，右手向右 -> 扩张
-                if (lData.dir === "LEFT" && rData.dir === "RIGHT" && (lData.speed > 1 || rData.speed > 1)) {
-                    action = "EXPAND (展开)";
-                }
-                // 如果左手向右，右手向左 -> 收缩
-                else if (lData.dir === "RIGHT" && rData.dir === "LEFT" && (lData.speed > 1 || rData.speed > 1)) {
-                    action = "MERGE (聚合)";
-                }
+            for (let j = start; j <= end; j++) {
+                let dist = 0;
+                const v1 = seq1[i-1];
+                const v2 = seq2[j-1];
+                // 欧氏距离
+                for(let k=0; k<v1.length; k++) dist += (v1[k]-v2[k])**2;
+                
+                dtw[i][j] = dist + Math.min(dtw[i-1][j], dtw[i][j-1], dtw[i-1][j-1]);
             }
         }
-
-        if (action) showAction(action);
+        return dtw[n][m] / (n + m);
     }
 
-    function showAction(text) {
-        if (actionText.textContent === text && actionText.classList.contains('show')) return;
+    // 识别循环
+    let cooldown = 0;
+    function recognizeAction() {
+        if (cooldown > 0) { cooldown--; return; }
+        if (savedActions.length === 0 || liveBuffer.length < 10) return;
+
+        let bestScore = Infinity;
+        let bestName = "";
+
+        // 遍历所有存下的动作
+        savedActions.forEach(action => {
+            const targetLen = action.data.length;
+            // 尝试匹配不同速度 (0.8x, 1.0x, 1.2x)
+            [0.8, 1.0, 1.2].forEach(speed => {
+                const tryLen = Math.floor(targetLen * speed);
+                if (liveBuffer.length < tryLen) return;
+
+                const sample = liveBuffer.slice(liveBuffer.length - tryLen);
+                const score = computeDTW(sample, action.data);
+                
+                if (score < bestScore) {
+                    bestScore = score;
+                    bestName = action.name;
+                }
+            });
+        });
+
+        // UI 更新
+        document.getElementById('diff-val').textContent = bestScore.toFixed(2);
         
-        actionText.textContent = text;
-        actionText.classList.add('show');
-        
-        if (actionTimer) clearTimeout(actionTimer);
-        actionTimer = setTimeout(() => {
-            actionText.classList.remove('show');
-        }, 1000);
+        // 阈值：1.5 比较宽松，适合双手复杂动作
+        const THRESHOLD = 1.5; 
+        const conf = Math.max(0, 1 - (bestScore/3.0)) * 100;
+        document.getElementById('conf-val').textContent = Math.round(conf) + "%";
+        document.getElementById('match-bar').style.width = conf + "%";
+
+        if (bestScore < THRESHOLD) {
+            triggerHologram(bestName);
+            liveBuffer = []; // 清空缓存，防止重复触发
+            cooldown = 40;   // 冷却时间
+        }
     }
 
 
     // ============================================
-    // 4. MediaPipe 主循环
+    // 3. 交互逻辑 (录制、倒计时)
     // ============================================
-    const videoElem = document.getElementById('input-video');
+    let isRecording = false;
+    let recBuffer = [];
+    const recBtn = document.getElementById('rec-btn');
+    const countLayer = document.getElementById('countdown-overlay');
+    const countText = document.getElementById('countdown-text');
+
+    window.triggerRecordFlow = function() {
+        if (isRecording) {
+            finishRecording();
+        } else {
+            const name = document.getElementById('action-name').value;
+            if(!name) return alert("请先输入动作名称！");
+            
+            // 倒计时逻辑
+            countLayer.style.display = 'flex';
+            let n = 3; countText.textContent = n;
+            const t = setInterval(() => {
+                n--;
+                if(n>0) countText.textContent = n;
+                else if(n===0) countText.textContent = "GO!";
+                else {
+                    clearInterval(t);
+                    countLayer.style.display = 'none';
+                    startRecording();
+                }
+            }, 1000);
+        }
+    }
+
+    function startRecording() {
+        isRecording = true;
+        recBuffer = [];
+        recBtn.textContent = "停止录制";
+        recBtn.classList.add('recording');
+        document.getElementById('sys-status').textContent = "正在录制...";
+        document.getElementById('sys-status').style.color = "#ff4444";
+    }
+
+    function finishRecording() {
+        isRecording = false;
+        recBtn.textContent = "开始录制 (倒计时)";
+        recBtn.classList.remove('recording');
+        document.getElementById('sys-status').textContent = "就绪";
+        document.getElementById('sys-status').style.color = "#00ffcc";
+
+        if (recBuffer.length < 10) return alert("动作太短，无法保存");
+        
+        const name = document.getElementById('action-name').value;
+        savedActions.push({ name: name, data: recBuffer });
+        
+        updateList();
+        saveDB();
+        triggerHologram(`已保存: ${name}`);
+    }
+
+    function updateList() {
+        const box = document.getElementById('action-list');
+        box.innerHTML = '';
+        savedActions.forEach((item, idx) => {
+            const div = document.createElement('div');
+            div.className = 'list-item';
+            div.innerHTML = `<span>${item.name}</span> <span class="del-icon" onclick="removeAction(${idx})">×</span>`;
+            box.appendChild(div);
+        });
+    }
+
+    window.removeAction = (i) => { savedActions.splice(i, 1); updateList(); saveDB(); }
+    window.saveDB = () => localStorage.setItem('myActions', JSON.stringify(savedActions));
+    updateList();
+
+    let holoTimer;
+    function triggerHologram(text) {
+        const el = document.getElementById('hologram-display');
+        el.textContent = text;
+        el.classList.add('active');
+        if (holoTimer) clearTimeout(holoTimer);
+        holoTimer = setTimeout(() => el.classList.remove('active'), 2000);
+    }
+
+
+    // ============================================
+    // 4. MediaPipe 集成
+    // ============================================
+    const videoElement = document.getElementById('input-video');
 
     function onResults(results) {
-        let lLM = null; 
+        let lLM = null;
         let rLM = null;
-        
-        if (results.multiHandLandmarks) {
-            for (let i = 0; i < results.multiHandLandmarks.length; i++) {
-                const lm = results.multiHandLandmarks[i];
+        let handStatus = "无手部";
+
+        leftHandVisual.update(null);
+        rightHandVisual.update(null);
+
+        if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+            results.multiHandLandmarks.forEach((lm, i) => {
                 const label = results.multiHandedness[i].label;
-                
-                // Right Label = 视觉右手 (屏幕右侧)
-                if (label === 'Right') rLM = lm;
-                else lLM = lm;
-            }
+                if (label === 'Right') {
+                    rightHandVisual.update(lm);
+                    rLM = lm;
+                } else {
+                    leftHandVisual.update(lm);
+                    lLM = lm;
+                }
+            });
+
+            if (lLM && rLM) handStatus = "双手中";
+            else if (lLM) handStatus = "左手中";
+            else if (rLM) handStatus = "右手中";
         }
+        document.getElementById('hand-status').textContent = handStatus;
 
-        // 1. 3D 渲染更新
-        const lWorld = leftHandVisual.update(lLM);
-        const rWorld = rightHandVisual.update(rLM);
+        // 提取特征 (基准化)
+        const feats = extractRelativeFeatures(lLM, rLM);
 
-        // 2. 物理分析
-        const lData = leftAnalyzer.analyze(lLM, lWorld);
-        const rData = rightAnalyzer.analyze(rLM, rWorld);
-
-        // 3. 语义综合
-        interpretActions(lData, rData);
+        if (isRecording) {
+            recBuffer.push(feats);
+        } else {
+            liveBuffer.push(feats);
+            if (liveBuffer.length > MAX_BUFFER) liveBuffer.shift();
+            recognizeAction();
+        }
 
         renderer.render(scene, camera);
     }
@@ -427,8 +467,8 @@
     });
     hands.onResults(onResults);
 
-    const cameraUtils = new Camera(videoElem, {
-        onFrame: async () => { await hands.send({image: videoElem}); },
+    const cameraUtils = new Camera(videoElement, {
+        onFrame: async () => { await hands.send({image: videoElement}); },
         width: 1280, height: 720
     });
     cameraUtils.start();
@@ -437,8 +477,6 @@
         camera.aspect = window.innerWidth / window.innerHeight;
         camera.updateProjectionMatrix();
         renderer.setSize(window.innerWidth, window.innerHeight);
-        vecCanvas.width = window.innerWidth;
-        vecCanvas.height = window.innerHeight;
     });
 
 </script>
