@@ -2,98 +2,81 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>AR 拟真手势交互系统</title>
+    <title>AI 智能手势训练系统</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/knn-classifier"></script>
+
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700&family=Orbitron:wght@700&display=swap" rel="stylesheet">
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; font-family: 'Noto Sans SC', sans-serif; }
-        
-        /* 核心布局：视频在底层，Canvas在上层 */
         #container { position: relative; width: 100vw; height: 100vh; }
         
-        /* 1. 摄像头背景 (镜像显示) */
         #input-video {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            object-fit: cover; /* 填满屏幕 */
-            transform: scaleX(-1); /* 镜像翻转，符合镜子直觉 */
-            z-index: 0;
+            object-fit: cover; transform: scaleX(-1); z-index: 0;
         }
 
-        /* 2. 左侧控制面板 - 亚克力风格 */
+        /* 左侧 AI 控制台 */
         #ui-layer {
-            position: absolute; top: 20px; left: 20px; width: 300px;
-            /* 亚克力毛玻璃效果 */
-            background: rgba(255, 255, 255, 0.15);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            border-radius: 16px;
-            padding: 20px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-            color: #fff;
-            z-index: 100;
+            position: absolute; top: 20px; left: 20px; width: 320px;
+            background: rgba(16, 20, 24, 0.85);
+            backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
+            border: 1px solid rgba(0, 255, 200, 0.3);
+            border-left: 4px solid #00ffc8;
+            border-radius: 12px; padding: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            color: #fff; z-index: 100;
         }
 
-        h2 { margin: 0 0 15px 0; font-size: 18px; color: #fff; text-shadow: 0 0 5px rgba(0,0,0,0.5); border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 10px;}
+        h2 { margin: 0 0 15px 0; font-family: 'Orbitron', sans-serif; color: #00ffc8; letter-spacing: 1px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px;}
         
-        .status-row { display: flex; justify-content: space-between; font-size: 12px; color: #eee; margin-bottom: 15px; }
+        .info-row { display: flex; justify-content: space-between; font-size: 12px; color: #aaa; margin-bottom: 15px; }
+        .highlight { color: #fff; font-weight: bold; }
 
-        /* 输入框与按钮 */
+        /* 训练控制区 */
+        .train-section { background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; margin-bottom: 15px; }
+        
         input { 
             width: 100%; padding: 10px; margin-bottom: 10px; 
-            border: 1px solid rgba(255,255,255,0.3); border-radius: 8px;
-            background: rgba(0,0,0,0.2); color: #fff; outline: none; box-sizing: border-box;
+            border: 1px solid #334; border-radius: 4px;
+            background: #0b0e11; color: #00ffc8; outline: none; box-sizing: border-box; font-weight: bold;
         }
-        input:focus { background: rgba(0,0,0,0.4); border-color: #fff; }
-
-        button {
-            width: 100%; padding: 12px; border: none; border-radius: 8px;
-            background: rgba(255, 255, 255, 0.9); color: #333; 
-            font-weight: bold; cursor: pointer; transition: all 0.2s;
-        }
-        button:hover { background: #fff; transform: scale(1.02); }
-        button.recording { background: #ff4444; color: white; animation: pulse 1s infinite; }
         
-        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(255,68,68, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(255,68,68, 0); } 100% { box-shadow: 0 0 0 0 rgba(255,68,68, 0); } }
-
-        /* 相似度条 */
-        .meter-box { margin-top: 15px; background: rgba(0,0,0,0.3); height: 8px; border-radius: 4px; overflow: hidden; }
-        .meter-bar { height: 100%; width: 0%; background: #00ff88; transition: width 0.2s; }
-        .meter-text { font-size: 10px; text-align: right; margin-top: 2px; color: #ccc;}
-
-        /* 列表 */
-        .list-wrap { margin-top: 20px; max-height: 200px; overflow-y: auto; border-top: 1px solid rgba(255,255,255,0.1); padding-top:10px;}
-        .gesture-item { display: flex; justify-content: space-between; padding: 8px 0; font-size: 13px; border-bottom: 1px solid rgba(255,255,255,0.05); }
-        .del-btn { color: #ff9999; cursor: pointer; padding: 0 5px; }
-
-        /* 3. 屏幕中央全息显示 - 亚克力面板风格 */
-        #hologram-card {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.9);
-            /* 亚克力板 */
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
-            border: 1px solid rgba(255, 255, 255, 0.4);
-            border-radius: 20px;
-            padding: 30px 60px;
-            box-shadow: 0 20px 50px rgba(0,0,0,0.2);
-            
-            /* 文字样式 */
-            font-size: 60px; font-weight: 900; color: #fff;
-            text-shadow: 0 2px 10px rgba(0,0,0,0.3);
-            text-align: center; white-space: nowrap;
-            
-            /* 动画 */
-            opacity: 0; pointer-events: none; z-index: 200;
-            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        /* 训练按钮 */
+        button#train-btn {
+            width: 100%; padding: 15px; border: none; border-radius: 4px;
+            background: linear-gradient(90deg, #00b894, #00cec9); color: #000; 
+            font-weight: 900; cursor: pointer; text-transform: uppercase; letter-spacing: 1px;
+            transition: all 0.1s;
         }
-        #hologram-card.active { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+        button#train-btn:active { transform: scale(0.95); background: #fff; }
+        button#train-btn.training { background: #ff7675; color: white; animation: pulse 0.5s infinite; }
 
-        /* 倒计时层 */
-        #countdown-layer {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.4); backdrop-filter: blur(5px);
-            display: none; justify-content: center; align-items: center; z-index: 300;
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
+
+        /* 样本列表 */
+        .class-list { max-height: 150px; overflow-y: auto; margin-top: 10px; }
+        .class-item { 
+            display: flex; justify-content: space-between; padding: 8px; 
+            background: rgba(0,0,0,0.3); margin-bottom: 5px; border-radius: 4px; font-size: 12px;
+            border-left: 2px solid #555; align-items: center;
         }
-        #countdown-num { font-size: 150px; font-weight: bold; color: #fff; text-shadow: 0 0 30px rgba(0,0,0,0.5); }
+        .class-item.active { border-left: 2px solid #00ffc8; background: rgba(0, 255, 200, 0.1); }
+        .sample-count { background: #333; padding: 2px 6px; border-radius: 10px; color: #fff; font-size: 10px; }
+
+        /* 预测结果展示 */
+        .prediction-box { margin-top: 15px; padding: 10px; background: rgba(0,0,0,0.4); border-radius: 6px; text-align: center; }
+        .pred-label { font-size: 24px; font-weight: bold; color: #00ffc8; text-shadow: 0 0 10px rgba(0,255,200,0.5); min-height: 36px;}
+        .pred-conf { font-size: 12px; color: #888; height: 16px;}
+
+        /* 全息文字 */
+        #hologram {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            font-family: 'Orbitron', sans-serif; font-size: 80px; font-weight: 900; 
+            color: rgba(255,255,255,0.9); text-shadow: 0 0 30px #00ffc8;
+            pointer-events: none; opacity: 0; transition: opacity 0.3s; z-index: 200;
+        }
+        #hologram.show { opacity: 1; }
     </style>
     
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
@@ -106,392 +89,321 @@
 <div id="container">
     <video id="input-video"></video>
     
-    <div id="countdown-layer"><div id="countdown-num">3</div></div>
-    
     <div id="ui-layer">
-        <h2>AR 手势控制中心</h2>
-        <div class="status-row">
-            <span>状态: <span id="sys-status" style="color:#00ff88">运行中</span></span>
-            <span>识别到: <span id="hand-count">0</span> 只手</span>
+        <h2>AI 神经训练核心</h2>
+        <div class="info-row">
+            <span>引擎: <span class="highlight">TensorFlow.js</span></span>
+            <span>状态: <span id="tf-status" style="color:#aaa">加载中...</span></span>
         </div>
 
-        <input type="text" id="gesture-name" placeholder="在此输入动作名称...">
-        <button id="rec-btn" onclick="startCountdownLogic()">开始录制 (倒计时)</button>
-        
-        <div class="meter-box"><div class="meter-bar" id="prob-bar"></div></div>
-        <div class="meter-text">动作匹配度: <span id="prob-val">0%</span></div>
+        <div class="train-section">
+            <div style="font-size:12px; color:#bbb; margin-bottom:5px;">第一步: 输入动作名称</div>
+            <input type="text" id="class-name" placeholder="例如: 竖大拇指">
+            
+            <div style="font-size:12px; color:#bbb; margin-bottom:5px;">第二步: 按住按钮喂数据</div>
+            <button id="train-btn" onmousedown="startTraining()" onmouseup="stopTraining()" ontouchstart="startTraining()" ontouchend="stopTraining()">
+                按住采集样本
+            </button>
+        </div>
 
-        <div class="list-wrap" id="gesture-list">
+        <div style="font-size:12px; color:#888;">已训练的分类 (样本数):</div>
+        <div class="class-list" id="class-list">
             </div>
-        
-        <div style="margin-top:15px; display:flex; gap:10px;">
-            <button onclick="saveDB()" style="font-size:12px; background:rgba(255,255,255,0.2); color:#fff;">保存配置</button>
-            <button onclick="clearDB()" style="font-size:12px; background:rgba(255,255,255,0.2); color:#ff9999;">清空</button>
+
+        <div class="prediction-box">
+            <div style="font-size:10px; color:#666;">AI 实时推理结果</div>
+            <div class="pred-label" id="result-label">--</div>
+            <div class="pred-conf" id="result-conf">置信度: 0%</div>
         </div>
+
+        <button onclick="clearAI()" style="width:100%; margin-top:10px; padding:8px; background:#333; border:none; color:#888; font-size:10px; cursor:pointer;">重置 AI 模型</button>
     </div>
 
-    <div id="hologram-card">测试文字</div>
+    <div id="hologram">AI READY</div>
 </div>
 
 <script>
     // ============================================
-    // 1. Three.js 场景 (透明背景 + AR对齐)
+    // 1. TensorFlow.js AI 逻辑 (KNN Classifier)
+    // ============================================
+    let classifier = null;
+    let isTraining = false;
+    let trainingLabel = "";
+    
+    // 存储每个类别的样本数，用于UI显示
+    let classCounts = {}; 
+
+    async function initTF() {
+        // 创建 KNN 分类器
+        classifier = knnClassifier.create();
+        document.getElementById('tf-status').textContent = "就绪";
+        document.getElementById('tf-status').style.color = "#00ffc8";
+    }
+    initTF();
+
+    // 添加样本到 AI
+    function addExample(features) {
+        if (!classifier || !isTraining) return;
+        
+        // 将特征数组转换为 Tensor
+        const tensor = tf.tensor(features);
+        
+        // 喂给分类器
+        classifier.addExample(tensor, trainingLabel);
+        
+        // 更新计数
+        if (!classCounts[trainingLabel]) classCounts[trainingLabel] = 0;
+        classCounts[trainingLabel]++;
+        
+        updateClassListUI();
+        
+        // 内存清理 (虽然 TFJS 会管理，但手动 dispose input tensor 是好习惯)
+        tensor.dispose();
+    }
+
+    // 预测
+    async function predict(features) {
+        if (!classifier || classifier.getNumClasses() === 0) return;
+        
+        const tensor = tf.tensor(features);
+        
+        try {
+            // k=3 表示参考最近的3个样本来投票
+            const result = await classifier.predictClass(tensor, 30); // k值增大增加稳定性
+            
+            const label = result.label;
+            const probability = result.confidences[label];
+            
+            // 更新 UI
+            const labelEl = document.getElementById('result-label');
+            const confEl = document.getElementById('result-conf');
+            
+            labelEl.textContent = label;
+            confEl.textContent = `置信度: ${Math.floor(probability * 100)}%`;
+
+            // 高亮列表
+            document.querySelectorAll('.class-item').forEach(el => el.classList.remove('active'));
+            const activeItem = document.getElementById(`item-${label}`);
+            if (activeItem) activeItem.classList.add('active');
+
+            // 全息显示 (置信度 > 80% 才显示)
+            const holo = document.getElementById('hologram');
+            if (probability > 0.8) {
+                holo.textContent = label;
+                holo.classList.add('show');
+            } else {
+                holo.classList.remove('show');
+            }
+
+        } catch (e) {
+            console.error(e);
+        } finally {
+            tensor.dispose();
+        }
+    }
+
+    // UI 控制
+    const trainBtn = document.getElementById('train-btn');
+    const nameInput = document.getElementById('class-name');
+
+    window.startTraining = function() {
+        const name = nameInput.value.trim();
+        if (!name) { alert("请先输入动作名称！"); return; }
+        trainingLabel = name;
+        isTraining = true;
+        trainBtn.textContent = "正在学习...";
+        trainBtn.classList.add('training');
+    };
+
+    window.stopTraining = function() {
+        isTraining = false;
+        trainBtn.textContent = "按住采集样本";
+        trainBtn.classList.remove('training');
+    };
+
+    window.clearAI = function() {
+        if(confirm("确定要删除所有训练数据吗？")) {
+            classifier.clearAllClasses();
+            classCounts = {};
+            updateClassListUI();
+            document.getElementById('result-label').textContent = "--";
+        }
+    }
+
+    function updateClassListUI() {
+        const list = document.getElementById('class-list');
+        list.innerHTML = "";
+        for (let [name, count] of Object.entries(classCounts)) {
+            const div = document.createElement('div');
+            div.className = 'class-item';
+            div.id = `item-${name}`;
+            div.innerHTML = `<span>${name}</span> <span class="sample-count">${count} 样本</span>`;
+            list.appendChild(div);
+        }
+    }
+
+
+    // ============================================
+    // 2. Three.js 视觉 (拟真手 + 识别点)
     // ============================================
     const scene = new THREE.Scene();
-    
-    // 关键：相机参数要微调，配合 AR 感觉
     const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(0, 0, 20); // 距离适中
+    camera.position.set(0, 0, 20);
 
-    // 关键：渲染器设为透明，才能看到底下的视频
     const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(window.devicePixelRatio);
-    renderer.setClearColor(0x000000, 0); // 完全透明
+    renderer.setClearColor(0x000000, 0);
     document.getElementById('container').appendChild(renderer.domElement);
 
-    // 灯光系统 - 模拟自然光照在手上
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
-    scene.add(ambientLight);
-    const dirLight = new THREE.DirectionalLight(0xffeedd, 0.8);
-    dirLight.position.set(5, 10, 10);
-    scene.add(dirLight);
-    const fillLight = new THREE.PointLight(0xccddff, 0.5);
-    fillLight.position.set(-5, 0, 5);
-    scene.add(fillLight);
+    // 灯光
+    scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+    const pointLight = new THREE.PointLight(0x00ffc8, 0.8);
+    pointLight.position.set(5, 5, 5);
+    scene.add(pointLight);
 
-    // ============================================
-    // 2. 拟真类人手部模型 (Humanoid Mesh)
-    // ============================================
-    // 我们不使用 Stick，而是使用粗壮的 Capsule/Cylinder 连接，
-    // 并使用 MeshPhysicalMaterial 模拟皮肤质感
-    
-    // 骨骼连接定义
     const BONES = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[0,9],[9,10],[10,11],[11,12],[0,13],[13,14],[14,15],[15,16],[0,17],[17,18],[18,19],[19,20],[5,9],[9,13],[13,17],[0,17],[0,5]];
 
-    class HumanoidHand {
+    class CyberHand {
         constructor() {
             this.group = new THREE.Group();
             scene.add(this.group);
+            
             this.segments = [];
+            this.trackers = []; // 识别点
 
-            // 皮肤材质
+            // 1. 皮肤材质 (拟人)
             const skinMat = new THREE.MeshPhysicalMaterial({
-                color: 0xffdbac, // 浅肤色
-                roughness: 0.3,
-                metalness: 0.1,
-                reflectivity: 0.5,
-                clearcoat: 0.1,
-                transparent: true,
-                opacity: 0.95
+                color: 0xffdbac, roughness: 0.3, metalness: 0.1, 
+                transparent: true, opacity: 0.9
             });
 
-            // 初始化骨骼段 (用 Mesh 模拟肌肉)
+            // 2. 识别点材质 (高亮青色能量球)
+            const trackerMat = new THREE.MeshBasicMaterial({ color: 0x00ffc8 });
+
+            // 构建骨骼蒙皮
             BONES.forEach(pair => {
-                // 使用圆柱体模拟手指节
-                const geo = new THREE.CylinderGeometry(0.55, 0.5, 1, 16);
-                geo.translate(0, 0.5, 0); // 调整中心点到底部
-                geo.rotateX(Math.PI/2);
-                
+                const geo = new THREE.CylinderGeometry(0.5, 0.45, 1, 16);
+                geo.translate(0, 0.5, 0); geo.rotateX(Math.PI/2);
                 const mesh = new THREE.Mesh(geo, skinMat);
-                mesh.castShadow = true;
-                
                 this.segments.push({ mesh: mesh, start: pair[0], end: pair[1] });
                 this.group.add(mesh);
             });
-            
-            // 关节处加球体，使连接平滑
-            this.joints = [];
+
+            // 构建识别点 (Tracker Points)
             for(let i=0; i<21; i++) {
-                const geo = new THREE.SphereGeometry(0.55, 16, 16);
-                const mesh = new THREE.Mesh(geo, skinMat);
-                this.joints.push(mesh);
-                this.group.add(mesh);
+                // 关节处用稍微大一点的球作为皮肤连接
+                const jointGeo = new THREE.SphereGeometry(0.5, 16, 16);
+                const jointMesh = new THREE.Mesh(jointGeo, skinMat);
+                this.group.add(jointMesh);
+
+                // 在关节中心叠加一个显眼的小亮点，代表AI捕捉点
+                const trackerGeo = new THREE.SphereGeometry(0.15, 8, 8);
+                const trackerMesh = new THREE.Mesh(trackerGeo, trackerMat);
+                trackerMesh.visible = true; // 默认可见
+                this.trackers.push({ joint: jointMesh, marker: trackerMesh });
+                this.group.add(trackerMesh);
             }
         }
 
         update(landmarks) {
-            if (!landmarks) {
-                this.group.visible = false;
-                return;
-            }
+            if (!landmarks) { this.group.visible = false; return; }
             this.group.visible = true;
-
+            
             const worldPos = [];
             landmarks.forEach((lm, i) => {
-                // 坐标映射：必须与视频画面对齐
-                // MediaPipe 输出 0-1。
-                // 3D 场景中，我们大致映射到 x: -15~15, y: -10~10
-                
                 const x = (0.5 - lm.x) * 32; 
                 const y = (0.5 - lm.y) * 24; 
-                // Z 轴缩放，体现远近
-                const z = lm.z * -25; 
-                
+                const z = lm.z * -25;
                 const v = new THREE.Vector3(x, y, z);
                 worldPos.push(v);
-                
-                // 更新关节球
-                this.joints[i].position.copy(v);
+
+                // 更新皮肤关节位置
+                this.trackers[i].joint.position.copy(v);
+                // 更新识别点位置 (为了好看，让它稍微浮在表面一点，或者就在中心发光)
+                this.trackers[i].marker.position.copy(v);
             });
 
-            // 更新骨骼段
+            // 更新骨骼连线
             this.segments.forEach(seg => {
                 const p1 = worldPos[seg.start];
                 const p2 = worldPos[seg.end];
-                
                 seg.mesh.position.copy(p1);
                 seg.mesh.lookAt(p2);
-                
-                // 缩放长度以连接两点
-                const dist = p1.distanceTo(p2);
-                seg.mesh.scale.set(1, 1, dist);
+                seg.mesh.scale.set(1, 1, p1.distanceTo(p2));
             });
         }
     }
 
-    const leftHand = new HumanoidHand();
-    const rightHand = new HumanoidHand();
-
+    const leftHand = new CyberHand();
+    const rightHand = new CyberHand();
 
     // ============================================
-    // 3. 增强版动作识别 (解决无反应问题)
+    // 3. 特征提取 (Flat Data for AI)
     // ============================================
-
-    let gestureDB = JSON.parse(localStorage.getItem('arGestures') || '[]');
-    let liveBuffer = [];
-    const MAX_BUFFER = 60; // 存2秒数据
-
-    // 特征提取：使用“相对手腕的归一化坐标”
-    function getFeatures(landmarks) {
-        if(!landmarks) return Array(45).fill(0); // 15 points * 3 dims
-        
-        const wrist = landmarks[0];
-        // 尺度因子：手掌大小 (手腕到中指根部)
-        let scale = Math.sqrt(
-            (landmarks[9].x - wrist.x)**2 + 
-            (landmarks[9].y - wrist.y)**2 + 
-            (landmarks[9].z - wrist.z)**2
-        ) || 0.1;
-
-        const feats = [];
-        // 选取关键特征点 (指尖 + 指根 + 拇指关节)
-        // 减少点数以减少噪音
-        const indices = [4, 8, 12, 16, 20, 5, 9, 13, 17]; 
-        
-        indices.forEach(i => {
-            feats.push((landmarks[i].x - wrist.x) / scale);
-            feats.push((landmarks[i].y - wrist.y) / scale);
-            feats.push((landmarks[i].z - wrist.z) / scale); 
-        });
-        return feats;
-    }
-
-    // DTW 距离算法
-    function calcDTW(seq1, seq2) {
-        const n = seq1.length;
-        const m = seq2.length;
-        // 长度差异过大直接放弃
-        if (Math.abs(n - m) > Math.min(n, m) * 0.5) return Infinity;
-
-        const dtw = Array(n + 1).fill(null).map(() => Array(m + 1).fill(Infinity));
-        dtw[0][0] = 0;
-
-        for (let i = 1; i <= n; i++) {
-            // 限制搜索窗口，优化性能
-            const window = Math.max(5, Math.abs(n-m)+5);
-            const start = Math.max(1, i - window);
-            const end = Math.min(m, i + window);
-            
-            for (let j = start; j <= end; j++) {
-                let dist = 0;
-                const v1 = seq1[i-1];
-                const v2 = seq2[j-1];
-                for(let k=0; k<v1.length; k++) dist += (v1[k]-v2[k])**2;
-                
-                dtw[i][j] = dist + Math.min(dtw[i-1][j], dtw[i][j-1], dtw[i-1][j-1]);
-            }
-        }
-        return dtw[n][m] / (n + m);
-    }
-
-    // 识别核心逻辑
-    let cooldown = 0;
     
-    function detectGesture() {
-        if(cooldown > 0) { cooldown--; return; }
-        if(gestureDB.length === 0 || liveBuffer.length < 15) return;
+    // 我们将双手的所有坐标压平成一个一维数组 [x1,y1,z1, x2,y2,z2 ...]
+    // 2只手 * 21点 * 3维 = 126个数值
+    // 如果某只手缺失，填0
+    function extractAIFeatures(lLandmarks, rLandmarks) {
+        let features = [];
 
-        let bestScore = Infinity;
-        let bestName = "";
-
-        gestureDB.forEach(g => {
-            const targetLen = g.data.length;
-            // 滑动窗口 + 多尺度匹配 (解决速度不一致导致不识别的问题)
-            // 尝试匹配 liveBuffer 尾部的不同长度：0.8倍长, 1.0倍长, 1.2倍长
-            const scales = [0.8, 1.0, 1.2];
-            
-            scales.forEach(scale => {
-                const tryLen = Math.floor(targetLen * scale);
-                if (liveBuffer.length < tryLen) return;
-                
-                const sample = liveBuffer.slice(liveBuffer.length - tryLen);
-                const score = calcDTW(sample, g.data);
-                
-                if(score < bestScore) {
-                    bestScore = score;
-                    bestName = g.name;
-                }
+        const processHand = (lm) => {
+            if (!lm) {
+                // 如果手丢了，填63个0
+                for(let i=0; i<21*3; i++) features.push(0);
+                return;
+            }
+            const wrist = lm[0];
+            // 简单的归一化: 减去手腕坐标，使手势位置独立
+            lm.forEach(p => {
+                features.push(p.x - wrist.x);
+                features.push(p.y - wrist.y);
+                features.push(p.z - wrist.z); // Z在近距离交互中对某些动作很重要
             });
-        });
+        };
 
-        // 可视化匹配度 (将分数转化为百分比)
-        // 阈值设为 1.5 (非常宽松) 以解决“无反应”问题
-        const THRESHOLD = 1.5; 
-        const confidence = Math.max(0, 1 - (bestScore / 3.0)) * 100;
-        
-        document.getElementById('prob-bar').style.width = confidence + "%";
-        document.getElementById('prob-val').textContent = Math.round(confidence) + "%";
+        processHand(lLandmarks);
+        processHand(rLandmarks);
 
-        if(bestScore < THRESHOLD) {
-            showHologram(bestName);
-            // 识别成功后，清空 buffer，防止连续触发，并设置冷却
-            liveBuffer = []; 
-            cooldown = 40; // 约1.5秒冷却
-        }
+        return features;
     }
-
-    // ============================================
-    // 4. UI 交互逻辑 (录制、倒计时、显示)
-    // ============================================
-
-    let isRecording = false;
-    let recBuffer = [];
-    const recBtn = document.getElementById('rec-btn');
-    const countdownLayer = document.getElementById('countdown-layer');
-    const countdownNum = document.getElementById('countdown-num');
-
-    window.startCountdownLogic = function() {
-        if(isRecording) {
-            stopRecording();
-            return;
-        }
-        const name = document.getElementById('gesture-name').value;
-        if(!name) return alert("请先输入动作名称！");
-
-        countdownLayer.style.display = 'flex';
-        let n = 3;
-        countdownNum.textContent = n;
-        
-        const timer = setInterval(() => {
-            n--;
-            if(n > 0) countdownNum.textContent = n;
-            else if(n === 0) countdownNum.textContent = "开始!";
-            else {
-                clearInterval(timer);
-                countdownLayer.style.display = 'none';
-                startRecording();
-            }
-        }, 1000);
-    };
-
-    function startRecording() {
-        isRecording = true;
-        recBuffer = [];
-        recBtn.textContent = "停止录制 (点击结束)";
-        recBtn.classList.add('recording');
-        document.getElementById('sys-status').textContent = "正在录制...";
-        document.getElementById('sys-status').style.color = "#ff4444";
-    }
-
-    function stopRecording() {
-        isRecording = false;
-        recBtn.textContent = "开始录制 (倒计时)";
-        recBtn.classList.remove('recording');
-        document.getElementById('sys-status').textContent = "运行中";
-        document.getElementById('sys-status').style.color = "#00ff88";
-
-        if(recBuffer.length < 10) return alert("动作太短，请重试");
-        
-        const name = document.getElementById('gesture-name').value;
-        gestureDB.push({ name: name, data: recBuffer });
-        updateList();
-        saveDB();
-        showHologram(`已保存: ${name}`);
-    }
-
-    let holoTimeout;
-    function showHologram(text) {
-        const el = document.getElementById('hologram-card');
-        el.textContent = text;
-        el.classList.add('active');
-        if(holoTimeout) clearTimeout(holoTimeout);
-        holoTimeout = setTimeout(() => {
-            el.classList.remove('active');
-        }, 2000);
-    }
-
-    function updateList() {
-        const div = document.getElementById('gesture-list');
-        div.innerHTML = '';
-        gestureDB.forEach((g, i) => {
-            const item = document.createElement('div');
-            item.className = 'gesture-item';
-            item.innerHTML = `<span>${g.name}</span> <span class="del-btn" onclick="delGesture(${i})">×</span>`;
-            div.appendChild(item);
-        });
-    }
-
-    window.delGesture = (i) => { gestureDB.splice(i, 1); updateList(); saveDB(); };
-    window.saveDB = () => localStorage.setItem('arGestures', JSON.stringify(gestureDB));
-    window.clearDB = () => { if(confirm("确定清空?")) { gestureDB=[]; updateList(); saveDB(); }};
-    
-    // 初始化列表
-    updateList();
 
 
     // ============================================
-    // 5. MediaPipe 主循环
+    // 4. MediaPipe Loop
     // ============================================
-
     const videoElem = document.getElementById('input-video');
-    
-    function onResults(results) {
-        let lLandmarks = null;
-        let rLandmarks = null;
-        let count = 0;
 
-        // 隐藏手部
+    function onResults(results) {
+        let lLM = null; 
+        let rLM = null;
+        
         leftHand.update(null);
         rightHand.update(null);
 
         if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-            count = results.multiHandLandmarks.length;
             results.multiHandLandmarks.forEach((lm, i) => {
                 const label = results.multiHandedness[i].label;
-                // 镜像后：Label Left 对应 屏幕右侧的手 (视觉上的右手)
                 if (label === 'Right') {
                     rightHand.update(lm);
-                    rLandmarks = lm;
+                    rLM = lm;
                 } else {
                     leftHand.update(lm);
-                    lLandmarks = lm;
+                    lLM = lm;
                 }
             });
         }
-        document.getElementById('hand-count').textContent = count;
 
-        // 特征处理
-        const featL = getFeatures(lLandmarks);
-        const featR = getFeatures(rLandmarks);
-        const combinedFeats = featL.concat(featR); // 拼接双手特征
+        // 提取特征
+        const features = extractAIFeatures(lLM, rLM);
 
-        if (isRecording) {
-            recBuffer.push(combinedFeats);
-        } else {
-            liveBuffer.push(combinedFeats);
-            if(liveBuffer.length > MAX_BUFFER) liveBuffer.shift();
-            detectGesture();
+        // 如果正在按按钮，喂数据给 AI
+        if (isTraining) {
+            addExample(features);
+        } else if (classifier && classifier.getNumClasses() > 0) {
+            // 如果不在训练，且模型里有数据，就预测
+            predict(features);
         }
 
         renderer.render(scene, camera);
@@ -501,8 +413,8 @@
     hands.setOptions({
         maxNumHands: 2,
         modelComplexity: 1,
-        minDetectionConfidence: 0.5, // 降低一点以防丢失
-        minTrackingConfidence: 0.5
+        minDetectionConfidence: 0.7,
+        minTrackingConfidence: 0.7
     });
     hands.onResults(onResults);
 
@@ -512,7 +424,6 @@
     });
     cameraUtils.start();
 
-    // 窗口自适应
     window.addEventListener('resize', () => {
         camera.aspect = window.innerWidth / window.innerHeight;
         camera.updateProjectionMatrix();
